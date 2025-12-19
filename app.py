@@ -4,7 +4,7 @@ import requests
 # 1. SAYFA AYARLARI
 st.set_page_config(page_title="Prof. Dr. Bülent DÖŞ | Eğitim Bilimleri", page_icon="🎓", layout="wide")
 
-# 2. ÜST BAŞLIK ALANI
+# 2. ÜST BAŞLIK
 st.markdown("""
     <div style='text-align: center; padding: 25px; background-color: #0E1117; border-radius: 15px; border: 1px solid #36393E;'>
         <h1 style='color: #FF4B4B; margin: 0;'>🎓 Eğitim Bilimleri Arama Motoru</h1>
@@ -23,11 +23,10 @@ with col3:
 
 st.markdown("---")
 
-# 4. ARAMA VE FİLTRELEME MANTIĞI
+# 4. ARAMA VE FİLTRELEME
 if query:
     with st.spinner('Eğitim veri tabanları taranıyor...'):
         url = f"https://api.openalex.org/works?filter=title.search:{query},concepts.id:C17744445,type:article&sort=cited_by_count:desc&per-page=100"
-        
         if start_year:
             url += f",publication_year:>{start_year}"
             
@@ -35,19 +34,18 @@ if query:
             r = requests.get(url, timeout=15)
             if r.status_code == 200:
                 results = r.json().get('results', [])
-                
                 final_list = []
-                # Tıp ve sağlık terimlerini ayıklamak için kara liste
                 ban_keywords = ['diet', 'health', 'medical', 'weight', 'clinical', 'obesity', 'patient', 'surgery', 'nursing', 'physician', 'hospital']
                 
                 for work in results:
-                    source_info = work.get('primary_location', {}) or {}
-                    source_obj = source_info.get('source', {}) or {}
-                    source_name = (source_obj.get('display_name') or '').lower()
-                    title_lower = (work.get('title') or '').lower()
+                    s_name = (work.get('primary_location', {}).get('source', {}) or {}).get('display_name', '').lower()
+                    t_lower = (work.get('title') or '').lower()
                     cites = work.get('cited_by_count') or 0
                     
-                    # Filtreleme Kontrolü
-                    is_medical = any(bad in source_name for bad in ban_keywords) or any(bad in title_lower for bad in ban_keywords)
+                    # Tıp filtresi kontrolü
+                    is_med = any(bad in s_name for bad in ban_keywords) or any(bad in t_lower for bad in ban_keywords)
                     
-                    if not is_medical and cites >= min_cite:
+                    # BURASI KRİTİK: Eğer tıp değilse ve atıf sayısı kurtarıyorsa listeye ekle
+                    if not is_med:
+                        if cites >= min_cite:
+                            final_list
