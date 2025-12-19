@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-# 1. SAYFA YAPILANDIRMASI
+# 1. SAYFA AYARLARI
 st.set_page_config(page_title="Eğitim Bilimleri Makale Araması", layout="wide")
 
 # 2. KURUMSAL BAŞLIK (GAÜN RENKLERİ)
@@ -29,24 +29,39 @@ st.markdown("---")
 # 4. ARAMA VE FİLTRELEME
 if q_in:
     with st.spinner('Veri tabanı taranıyor...'):
-        # Tam eşleşme sorgusu
         target_url = f'https://api.openalex.org/works?filter=title.search:"{q_in}",concepts.id:C17744445,type:article,publication_year:>{y_start}&sort=cited_by_count:desc&per-page=50'
         try:
             r = requests.get(target_url, timeout=15)
             if r.status_code == 200:
                 data = r.json().get('results', [])
                 ban = ['health', 'medical', 'clinical', 'nursing', 'patient', 'medicine', 'surgery', 'hospital']
+                found_list = []
                 
-                found_count = 0
                 for w in data:
                     title = w.get('title', '')
                     src = (w.get('primary_location', {}).get('source', {}) or {}).get('display_name', '').lower()
                     cite = w.get('cited_by_count', 0)
-                    
-                    # Tam başlık kontrolü ve tıp filtresi
                     if q_in.lower() in title.lower() and not any(b in src for b in ban):
                         if cite >= min_c:
-                            found_count += 1
-                            with st.container():
-                                st.markdown(f"### 📄 {title}")
-                                col_a,
+                            found_list.append(w)
+                
+                if found_list:
+                    st.success(f"{len(found_list)} makale bulundu.")
+                    for w in found_list:
+                        with st.container():
+                            st.markdown(f"### 📄 {w.get('title')}")
+                            sn = (w.get('primary_location', {}).get('source', {}) or {}).get('display_name', 'Eğitim Dergisi')
+                            st.write(f"🏢 **Dergi:** {sn} | 📅 **Yıl:** {w.get('publication_year')} | 📈 **Atıf:** {w.get('cited_by_count')}")
+                            if w.get('doi'):
+                                st.write(f"🔗 [Makaleyi Görüntüle]({w.get('doi')})")
+                            st.markdown("---")
+                else:
+                    st.warning("Sonuç bulunamadı.")
+            else:
+                st.error("Veri tabanı hatası.")
+        except:
+            st.error("Bağlantı hatası oluştu.")
+else:
+    st.info("Lütfen bir terim girerek aramayı başlatın.")
+
+st.markdown("<p style='text-align: center; color: gray;'>© 2025 | Gaziantep Üniversitesi</p>", unsafe_allow_html=True)
