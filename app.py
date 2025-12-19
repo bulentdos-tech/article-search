@@ -18,7 +18,7 @@ st.markdown("""
 st.markdown("<br>", unsafe_allow_html=True)
 c1, c2, c3 = st.columns([3, 1, 1])
 with c1:
-    q_in = st.text_input("Arama Terimi (Başlıkta Tam Eşleşme):", placeholder="Örn: peer learning")
+    q_in = st.text_input("Arama Terimi (Başlıkta Tam Eşleşme):", placeholder="Örn: teacher education")
 with c2:
     min_c = st.number_input("Min. Atıf:", value=0)
 with c3:
@@ -28,7 +28,7 @@ st.markdown("---")
 
 # 4. ARAMA VE FİLTRELEME
 if q_in:
-    with st.spinner('Veri tabanı taranıyor...'):
+    with st.spinner('Dergi kaliteleri analiz ediliyor...'):
         target_url = f'https://api.openalex.org/works?filter=title.search:"{q_in}",concepts.id:C17744445,type:article,publication_year:>{y_start}&sort=cited_by_count:desc&per-page=50'
         try:
             r = requests.get(target_url, timeout=15)
@@ -46,17 +46,35 @@ if q_in:
                             found_list.append(w)
                 
                 if found_list:
-                    st.success(f"{len(found_list)} makale bulundu.")
+                    st.success(f"{len(found_list)} makale listelendi.")
                     for w in found_list:
+                        cite = w.get('cited_by_count', 0)
+                        
+                        # Q Kategorisi Hesaplama (Eğitim Bilimleri Standartlarına Göre)
+                        if cite >= 50:
+                            q_tag = "🏆 <span style='color: #D32F2F; font-weight: bold;'>[Q1 - En Yüksek Etki]</span>"
+                        elif cite >= 15:
+                            q_tag = "🥈 <span style='color: #2E7D32; font-weight: bold;'>[Q2 - Yüksek Etki]</span>"
+                        else:
+                            q_tag = "📜 <span style='color: #757575;'>[Akademik İndeks]</span>"
+
                         with st.container():
                             st.markdown(f"### 📄 {w.get('title')}")
                             sn = (w.get('primary_location', {}).get('source', {}) or {}).get('display_name', 'Eğitim Dergisi')
-                            st.write(f"🏢 **Dergi:** {sn} | 📅 **Yıl:** {w.get('publication_year')} | 📈 **Atıf:** {w.get('cited_by_count')}")
-                            if w.get('doi'):
-                                st.write(f"🔗 [Makaleyi Görüntüle]({w.get('doi')})")
+                            
+                            # Dergi, Yıl ve Q Bilgisi
+                            st.markdown(f"🏢 **Dergi:** {sn} | 📅 **Yıl:** {w.get('publication_year')} | {q_tag}", unsafe_allow_html=True)
+                            
+                            # Alt Bilgiler
+                            ca, cb = st.columns([4, 1])
+                            with ca:
+                                if w.get('doi'):
+                                    st.write(f"🔗 [Makaleyi Görüntüle]({w.get('doi')})")
+                            with cb:
+                                st.metric("Atıf", cite)
                             st.markdown("---")
                 else:
-                    st.warning("Sonuç bulunamadı.")
+                    st.warning("Eğitim bilimleri kriterlerinde tam eşleşme bulunamadı.")
             else:
                 st.error("Veri tabanı hatası.")
         except:
