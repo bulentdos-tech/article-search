@@ -8,7 +8,8 @@ st.set_page_config(page_title="Prof. Dr. Bülent DÖŞ | Akademik Arama", page_i
 st.markdown("""
     <div style='text-align: center; padding: 20px; background-color: #0E1117; border-radius: 15px; border: 1px solid #36393E;'>
         <h1 style='color: #FF4B4B; margin: 0;'>🔍 Akademik Literatür Arama Motoru</h1>
-        <p style='color: #808495;'>Prof. Dr. Bülent DÖŞ - Küresel Akademik Veri Tarama</p>
+        <p style='color: #FAFAFA; font-size: 18px; opacity: 0.8;'>Küresel Veri Tabanlarında 50+ Nitelikli Sonuç</p>
+        <p style='color: #808495;'>Geliştiren: <b>Prof. Dr. Bülent DÖŞ</b></p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -16,19 +17,20 @@ st.markdown("""
 col1, col2, col3 = st.columns([3, 1, 1])
 
 with col1:
-    query = st.text_input("Arama Terimi (Türkçe veya İngilizce):", placeholder="Örn: 'Distance Learning'")
+    query = st.text_input("Arama Terimi (İngilizce önerilir):", placeholder="Örn: 'Distance Learning' veya 'Educational Technology'")
 
 with col2:
-    min_cite = st.number_input("Min. Atıf Sayısı:", min_value=0, value=0)
+    min_cite = st.number_input("Min. Atıf Sayısı:", min_value=0, value=5)
 
 with col3:
-    start_year = st.number_input("Başlangıç Yılı:", min_value=1950, max_value=2025, value=2010)
+    start_year = st.number_input("Başlangıç Yılı:", min_value=1950, max_value=2025, value=2015)
 
 st.markdown("---")
 
 if query:
-    with st.spinner('Veri tabanları taranıyor...'):
-        url = f"https://api.openalex.org/works?search={query}&filter=cited_by_count:>{min_cite},publication_year:>{start_year}&sort=cited_by_count:desc&per-page=20"
+    with st.spinner(f"'{query}' konusuyla ilgili en iyi 50 makale süzülüyor..."):
+        # per-page parametresini 50 yaptık
+        url = f"https://api.openalex.org/works?search={query}&filter=cited_by_count:>{min_cite},publication_year:>{start_year}&sort=cited_by_count:desc&per-page=50"
         
         try:
             response = requests.get(url)
@@ -37,40 +39,13 @@ if query:
                 results = data.get('results', [])
                 
                 if results:
-                    st.success(f"'{query}' ile ilgili {len(results)} sonuç listelendi.")
+                    st.success(f"Kriterlerinize uygun en popüler {len(results)} makale başarıyla listelendi.")
                     for work in results:
-                        # GÜVENLİ VERİ ÇEKME (NoneType hatasını bu bloklar engeller)
+                        # Güvenli veri çekme
                         title = work.get('title') or "Başlıksız Makale"
                         year = work.get('publication_year') or "Bilinmiyor"
                         cites = work.get('cited_by_count') or 0
                         doi = work.get('doi') or "#"
                         
-                        # Dergi ismini en derin katmana kadar kontrol ederek alıyoruz
                         source_name = "Bilinmeyen Kaynak"
-                        primary_loc = work.get('primary_location')
-                        if primary_loc:
-                            source = primary_loc.get('source')
-                            if source:
-                                source_name = source.get('display_name') or "Bilinmeyen Dergi"
-                        
-                        lang = (work.get('language') or "Bilinmiyor").upper()
-                        
-                        with st.container():
-                            st.markdown(f"### 📄 {title}")
-                            c_left, c_right = st.columns([4, 1])
-                            with c_left:
-                                st.write(f"🏢 **Kaynak:** :blue[{source_name}]")
-                                st.write(f"📅 **Yıl:** {year} | 🌍 **Dil:** {lang}")
-                                if doi != "#":
-                                    st.write(f"🔗 [Makaleyi Görüntüle]({doi})")
-                            with c_right:
-                                st.metric("Atıf", cites)
-                            st.markdown("---")
-                else:
-                    st.warning("Sonuç bulunamadı.")
-            else:
-                st.error("Veri tabanı hatası.")
-        except Exception as e:
-            st.error(f"Sistem şu an meşgul, lütfen tekrar deneyin.")
-else:
-    st.info("Aramaya başlamak için yukarıdaki kutuya bir konu yazın.")
+                        primary
