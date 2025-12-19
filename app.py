@@ -29,13 +29,13 @@ st.markdown("---")
 # İşlem Bloğu
 if query:
     with st.spinner('Veri tabanları taranıyor...'):
-        # OpenAlex API sorgusu
         url = f"https://api.openalex.org/works?search={query}&filter=cited_by_count:>{min_cite},publication_year:>{start_year}&sort=cited_by_count:desc&per-page=20"
         
         try:
             response = requests.get(url)
             if response.status_code == 200:
-                results = response.json().get('results', [])
+                data = response.json()
+                results = data.get('results', [])
                 
                 if results:
                     st.success(f"'{query}' ile ilgili {len(results)} sonuç listelendi.")
@@ -43,4 +43,27 @@ if query:
                         title = work.get('title', 'Başlıksız')
                         source_data = work.get('primary_location', {}).get('source', {})
                         source_name = source_data.get('display_name', 'Bilimsel Kaynak')
-                        lang
+                        lang = work.get('language', 'Belirtilmemiş')
+                        
+                        with st.container():
+                            st.markdown(f"### 📄 {title}")
+                            c_left, c_right = st.columns([4, 1])
+                            with c_left:
+                                st.write(f"🏢 **Kaynak:** :blue[{source_name}]")
+                                st.write(f"📅 **Yıl:** {work.get('publication_year')} | 🌍 **Dil:** {lang.upper()}")
+                                if work.get('doi'):
+                                    st.write(f"🔗 [Makaleyi Görüntüle]({work.get('doi')})")
+                            with c_right:
+                                st.metric("Atıf", work.get('cited_by_count'))
+                            st.markdown("---")
+                else:
+                    st.warning("Sonuç bulunamadı. Lütfen İngilizce terimlerle aramayı deneyin.")
+            else:
+                st.error("Veri tabanı sunucusuna bağlanılamadı.")
+        except Exception as e:
+            st.error(f"Sistem Hatası: {e}")
+else:
+    st.info("Aramaya başlamak için yukarıdaki kutuya bir konu yazın.")
+
+# Alt Bilgi
+st.markdown("<div style='text-align: center; color: gray; font-size: 12px;'>Bu sistem OpenAlex API altyapısını kullanmaktadır.</div>", unsafe_allow_html=True)
