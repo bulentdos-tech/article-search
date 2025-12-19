@@ -28,32 +28,36 @@ st.markdown("---")
 # --- VERİ ÇEKME VE LİSTELEME ---
 if query:
     with st.spinner('Küresel veri tabanları taranıyor, lütfen bekleyin...'):
-        # OpenAlex API - Atıf sayısına göre sıralı ve filtreli
         url = f"https://api.openalex.org/works?search={query}&filter=cited_by_count:>{min_cite}&sort=cited_by_count:desc"
         
         try:
             response = requests.get(url)
             if response.status_code == 200:
                 data = response.json()
-                results = data.get('results', [])
+                # Hata aldığınız 'get' kısmı burada kontrol altına alındı:
+                results = data.get('results', []) if data else []
                 
                 if results:
                     st.success(f"Kriterlerinize uygun en prestijli {len(results)} çalışma bulundu.")
-                    
                     for work in results:
-                        # Bilgileri ayıkla
-                        title = work.get('title')
-                        year = work.get('publication_year')
-                        cites = work.get('cited_by_count')
-                        source = work.get('primary_location', {}).get('source', {}).get('display_name', 'Bilinmeyen Dergi')
+                        if not work: continue # Boş kayıtları atla
+                        
+                        title = work.get('title', 'Başlıksız Makale')
+                        year = work.get('publication_year', 'Yıl Belirtilmemiş')
+                        cites = work.get('cited_by_count', 0)
+                        
+                        # Dergi ismini güvenli çekme
+                        primary_loc = work.get('primary_location') or {}
+                        source = primary_loc.get('source') or {}
+                        journal_name = source.get('display_name', 'Bilinmeyen Dergi')
+                        
                         doi = work.get('doi')
                         
-                        # Görsel Kart Tasarımı
                         with st.container():
                             st.markdown(f"### 📄 {title}")
                             c_left, c_right = st.columns([4, 1])
                             with c_left:
-                                st.write(f"🏢 **Dergi:** {source}")
+                                st.write(f"🏢 **Dergi:** {journal_name}")
                                 st.write(f"📅 **Yıl:** {year}")
                                 if doi:
                                     st.markdown(f"[🔗 Makaleyi Görüntüle / PDF]({doi})")
@@ -61,11 +65,13 @@ if query:
                                 st.metric("Atıf Sayısı", cites)
                             st.markdown("<hr style='border: 0.5px solid #36393E;'>", unsafe_allow_html=True)
                 else:
-                    st.warning("Bu atıf barajıyla eşleşen bir sonuç bulunamadı. Filtreyi düşürmeyi deneyebilirsiniz.")
+                    st.warning("Bu kriterlere uygun sonuç bulunamadı.")
             else:
-                st.error("Veri tabanına şu an ulaşılamıyor. Lütfen az sonra tekrar deneyin.")
+                st.error("Veri tabanı şu an yanıt vermiyor.")
         except Exception as e:
-            st.error(f"Hata: {e}")
+            st.error(f"Sistem Hatası: {e}")
+else:
+    st.info("Lütfen yukarıdaki kutuya aramak istediğiniz konuyu yazın.")
 
 # --- BİLGİ NOTU ---
 with st.expander("ℹ️ Bu Sistem Nasıl Çalışır?"):
