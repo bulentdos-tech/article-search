@@ -1,10 +1,12 @@
 import streamlit as st
 import requests
+import pandas as pd
+from io import BytesIO
 
 # 1. SAYFA AYARLARI
 st.set_page_config(page_title="Eğitim Bilimleri Makale Araması", layout="wide")
 
-# 2. KURUMSAL BAŞLIK (GAÜN RENKLERİ)
+# 2. KURUMSAL BAŞLIK
 st.markdown("""
     <style>
     .scopus-badge {
@@ -34,63 +36,73 @@ st.markdown("---")
 
 # 4. ARAMA VE FİLTRELEME
 if q_in:
-    with st.spinner('Scopus veri tabanı ve dergi kaliteleri analiz ediliyor...'):
+    with st.spinner('Veriler hazırlanıyor ve analiz ediliyor...'):
         target_url = f'https://api.openalex.org/works?filter=title.search:"{q_in}",concepts.id:C17744445,type:article,publication_year:>{y_start}&sort=cited_by_count:desc&per-page=50'
         try:
             r = requests.get(target_url, timeout=15)
             if r.status_code == 200:
                 data = r.json().get('results', [])
                 ban = ['health', 'medical', 'clinical', 'nursing', 'patient', 'medicine', 'surgery', 'hospital']
-                found_list = []
+                
+                export_data = [] # Excel için liste
                 
                 for w in data:
                     title = w.get('title', '')
                     src_obj = (w.get('primary_location', {}).get('source', {}) or {})
-                    src_name = src_obj.get('display_name', '').lower()
+                    src_name = src_obj.get('display_name', '')
                     cite = w.get('cited_by_count', 0)
+                    year = w.get('publication_year')
+                    doi = w.get('doi', '')
                     
-                    if q_in.lower() in title.lower() and not any(b in src_name for b in ban):
+                    if q_in.lower() in title.lower() and not any(b in src_name.lower() for b in ban):
                         if cite >= min_c:
-                            found_list.append(w)
+                            # Q ve Scopus Analizi
+                            q_val = "Q1" if cite >= 50 else ("Q2" if cite >= 15 else "İndeksli")
+                            is_scopus = "Evet" if src_obj.get('issn') else "Hayır"
+                            
+                            export_data.append({
+                                "Makale Adı": title,
+                                "Dergi": src_name,
+                                "Yıl": year,
+                                "Atıf Sayısı": cite,
+                                "Kalite (Q)": q_val,
+                                "Scopus": is_scopus,
+                                "DOI Link": doi
+                            })
                 
-                if found_list:
-                    st.success(f"Kriterlere uygun {len(found_list)} prestijli makale bulundu.")
-                    for w in found_list:
-                        cite = w.get('cited_by_count', 0)
-                        src_obj = (w.get('primary_location', {}).get('source', {}) or {})
-                        
-                        # SCOPUS KONTROLÜ (ISSN varsa Scopus indekslidir)
-                        scopus_html = ""
-                        if src_obj.get('issn'):
-                            scopus_html = "<span class='scopus-badge'>🔹 SCOPUS İNDEKSLİ</span>"
-                        
-                        # Q KATEGORİSİ
-                        if cite >= 50:
-                            q_tag = "🏆 <span style='color: #D32F2F; font-weight: bold;'>[Q1]</span>"
-                        elif cite >= 15:
-                            q_tag = "🥈 <span style='color: #2E7D32; font-weight: bold;'>[Q2]</span>"
-                        else:
-                            q_tag = "📜 <span style='color: #757575;'>[İndeksli]</span>"
-
+                if export_data:
+                    # Excel İndirme Butonu
+                    df = pd.DataFrame(export_data)
+                    output = BytesIO()
+                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                        df.to_excel(writer, index=False, sheet_name='Makale Listesi')
+                    
+                    st.download_button(
+                        label="📥 Sonuçları Excel (XLSX) Olarak İndir",
+                        data=output.getvalue(),
+                        file_name=f"{q_in.replace(' ','_')}_makaleler.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                    
+                    st.success(f"{len(export_data)} prestijli makale bulundu.")
+                    for item in export_data:
                         with st.container():
-                            st.markdown(f"### 📄 {w.get('title')}")
-                            sn = src_obj.get('display_name', 'Eğitim Dergisi')
-                            
-                            st.markdown(f"🏢 **Dergi:** {sn} | 📅 **Yıl:** {w.get('publication_year')} | {q_tag} {scopus_html}", unsafe_allow_html=True)
-                            
+                            q_color = "#D32F2F" if item["Kalite (Q)"] == "Q1" else "#2E7D32"
+                            sc_badge = "<span class='scopus-badge'>🔹 SCOPUS</span>" if item["Scopus"] == "Evet" else ""
+                            st.markdown(f"### 📄 {item['Makale Adı']}")
+                            st.markdown(f"🏢 **Dergi:** {item['Dergi']} | 📅 **Yıl:** {item['Yıl']} | <span style='color:{q_color}; font-weight:bold;'>[{item['Kalite (Q)']}]</span> {sc_badge}", unsafe_allow_html=True)
                             ca, cb = st.columns([4, 1])
                             with ca:
-                                if w.get('doi'):
-                                    st.write(f"🔗 [Makaleyi Görüntüle]({w.get('doi')})")
+                                if item["DOI Link"]: st.write(f"🔗 [Makaleye Git]({item['DOI Link']})")
                             with cb:
-                                st.metric("Atıf", cite)
+                                st.metric("Atıf", item["Atıf Sayısı"])
                             st.markdown("---")
                 else:
                     st.warning("Sonuç bulunamadı.")
             else:
                 st.error("Veri tabanı hatası.")
-        except:
-            st.error("Bağlantı hatası.")
+        except Exception as e:
+            st.error(f"Bağlantı hatası: {e}")
 else:
     st.info("Lütfen bir terim girerek aramayı başlatın.")
 
