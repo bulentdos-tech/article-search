@@ -1,21 +1,21 @@
 import streamlit as st
 import requests
 
-# 1. SAYFA AYARLARI
+# 1. SAYFA YAPILANDIRMASI
 st.set_page_config(page_title="Prof. Dr. Bülent DÖŞ | Eğitim Bilimleri", page_icon="🎓", layout="wide")
 
 # 2. ÜST BAŞLIK
 st.markdown("""
     <div style='text-align: center; padding: 25px; background-color: #0E1117; border-radius: 15px; border: 1px solid #36393E;'>
         <h1 style='color: #FF4B4B; margin: 0;'>🎓 Eğitim Bilimleri Arama Motoru</h1>
-        <p style='color: #808495;'>Prof. Dr. Bülent DÖŞ - Akademik Literatür Tarama Sistemi</p>
+        <p style='color: #FAFAFA; font-size: 18px; opacity: 0.8;'>Prof. Dr. Bülent DÖŞ - Akademik Literatür Tarama</p>
     </div>
     """, unsafe_allow_html=True)
 
-# 3. ARAMA PANELİ
+# 3. KULLANICI GİRİŞ PANELİ
 col1, col2, col3 = st.columns([3, 1, 1])
 with col1:
-    query = st.text_input("Makale Başlığında Ara:", placeholder="Örn: 'Curriculum' veya 'Teacher Training'")
+    query = st.text_input("Makale Başlığında Ara:", placeholder="Örn: 'Curriculum development'")
 with col2:
     min_cite = st.number_input("Min. Atıf:", min_value=0, value=0)
 with col3:
@@ -23,9 +23,10 @@ with col3:
 
 st.markdown("---")
 
-# 4. ARAMA VE FİLTRELEME
+# 4. ARAMA VE AYIKLAMA SÜRECİ
 if query:
     with st.spinner('Eğitim veri tabanları taranıyor...'):
+        # API URL Hazırlığı
         url = f"https://api.openalex.org/works?filter=title.search:{query},concepts.id:C17744445,type:article&sort=cited_by_count:desc&per-page=100"
         if start_year:
             url += f",publication_year:>{start_year}"
@@ -35,17 +36,26 @@ if query:
             if r.status_code == 200:
                 results = r.json().get('results', [])
                 final_list = []
-                ban_keywords = ['diet', 'health', 'medical', 'weight', 'clinical', 'obesity', 'patient', 'surgery', 'nursing', 'physician', 'hospital']
+                
+                # Sağlık ve tıp makalelerini ayıklayan kara liste
+                ban_words = ['diet', 'health', 'medical', 'weight', 'clinical', 'obesity', 'patient', 'surgery', 'nursing', 'physician', 'hospital', 'disease']
                 
                 for work in results:
                     s_name = (work.get('primary_location', {}).get('source', {}) or {}).get('display_name', '').lower()
                     t_lower = (work.get('title') or '').lower()
                     cites = work.get('cited_by_count') or 0
                     
-                    # Tıp filtresi kontrolü
-                    is_med = any(bad in s_name for bad in ban_keywords) or any(bad in t_lower for bad in ban_keywords)
+                    # Filtre kontrolü: Ne başlıkta ne dergi adında tıp terimi geçmemeli
+                    is_med = any(bad in s_name for bad in ban_words) or any(bad in t_lower for bad in ban_words)
                     
-                    # BURASI KRİTİK: Eğer tıp değilse ve atıf sayısı kurtarıyorsa listeye ekle
-                    if not is_med:
-                        if cites >= min_cite:
-                            final_list
+                    if not is_med and cites >= min_cite:
+                        final_list.append(work)
+                
+                # Ekrana basma
+                if final_list:
+                    st.success(f"Eğitim bilimleri odaklı {len(final_list[:50])} prestijli makale bulundu.")
+                    for work in final_list[:50]:
+                        t = work.get('title', 'Başlıksız')
+                        y = work.get('publication_year', 'Bilinmiyor')
+                        c = work.get('cited_by_count', 0)
+                        d = work.get('doi
