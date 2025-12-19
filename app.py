@@ -1,28 +1,59 @@
 import streamlit as st
 import requests
 
-st.set_page_config(page_title="Prof. Dr. Bülent DÖŞ | Kesin Arama", page_icon="🎓", layout="wide")
+# 1. SAYFA YAPILANDIRMASI VE TEMA
+st.set_page_config(page_title="Eğitim Bilimleri Makale Araması", page_icon="🎓", layout="wide")
 
+# GAÜN Kurumsal Renkleri ve Stil Uygulaması
 st.markdown("""
-    <div style='text-align: center; padding: 20px; background-color: #0E1117; border-radius: 10px;'>
-        <h1 style='color: #FF4B4B;'>🎓 Eğitim Bilimleri Kesin Arama</h1>
-        <p style='color: #808495;'>Sadece Başlığında "Tam Olarak" Bu İfade Geçen Makaleler</p>
+    <style>
+    .main {
+        background-color: #f5f5f5;
+    }
+    .stButton>button {
+        background-color: #D32F2F;
+        color: white;
+    }
+    .header-box {
+        text-align: center; 
+        padding: 30px; 
+        background-color: #D32F2F; /* GAÜN Kırmızısı */
+        border-radius: 10px;
+        color: white;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .footer-text {
+        text-align: center;
+        color: #333;
+        font-weight: bold;
+        margin-top: 10px;
+    }
+    </style>
+    
+    <div class="header-box">
+        <h1 style='margin: 0; font-size: 40px;'>Eğitim Bilimleri Makale Araması</h1>
+        <h2 style='margin: 10px 0 0 0; font-weight: normal;'>Prof. Dr. Bülent DÖŞ</h2>
+        <p style='margin: 5px 0 0 0; font-size: 18px;'>Gaziantep University</p>
+        <p style='margin: 5px 0 0 0; font-size: 16px; opacity: 0.9;'>✉️ bulentdos@yahoo.com</p>
     </div>
     """, unsafe_allow_html=True)
 
+# 2. ARAMA PANELİ
 col1, col2, col3 = st.columns([3, 1, 1])
 with col1:
-    # Kullanıcıdan gelen terimi alıyoruz
-    q_in = st.text_input("Arama Terimi (Başlıkta olduğu gibi yazın):", placeholder="Örn: peer learning")
+    q_in = st.text_input("Arama Terimi (Başlıkta Tam Eşleşme):", placeholder="Örn: teacher professional development")
 with col2:
-    min_c = st.number_input("Min. Atıf:", value=0)
+    min_c = st.number_input("Min. Atıf Sayısı:", value=0)
 with col3:
-    y_start = st.number_input("Yıl:", value=2010)
+    y_start = st.number_input("Yıl Filtresi:", value=2010)
 
+st.markdown("---")
+
+# 3. KESİN ARAMA MANTIĞI
 if q_in:
-    with st.spinner('Tam eşleşme aranıyor...'):
-        # DEĞİŞİKLİK: Terimi çift tırnak içine alarak API'ye "bu kelime grubunu bozma" diyoruz.
-        # title.search artık sadece başlıkta bu kalıbı arayacak.
+    with st.spinner('Akademik veri tabanında kesin eşleşme aranıyor...'):
+        # Çift tırnak ile tam kalıp araması yapıyoruz
         exact_query = f'"{q_in}"'
         url = f"https://api.openalex.org/works?filter=title.search:{exact_query},concepts.id:C17744445,type:article,publication_year:>{y_start}&sort=cited_by_count:desc&per-page=50"
         
@@ -31,40 +62,11 @@ if q_in:
             if r.status_code == 200:
                 res = r.json().get('results', [])
                 
-                # Sağlık ve alakasız dergi filtreleri
-                ban = ['health', 'medical', 'clinical', 'nursing', 'patient', 'medicine', 'surgery', 'hospital', 'disease', 'physician']
+                # Sadece Sosyal Bilimler ve Eğitim odaklı tutmak için sağlık filtreleri
+                ban = ['health', 'medical', 'clinical', 'nursing', 'patient', 'medicine', 'surgery', 'hospital', 'disease', 'physician', 'biomedical']
                 
                 final_results = []
                 for w in res:
                     title = w.get('title', '')
-                    s_name = (w.get('primary_location', {}).get('source', {}) or {}).get('display_name', '').lower()
-                    
-                    # 1. Kontrol: Başlıkta tam kelime grubu geçiyor mu? (Büyük/Küçük harf duyarsız)
-                    if q_in.lower() in title.lower():
-                        # 2. Kontrol: Sağlık dergisi mi?
-                        if not any(bad in s_name for bad in ban):
-                            if w.get('cited_by_count', 0) >= min_c:
-                                final_results.append(w)
-
-                if final_results:
-                    st.success(f"Başlığında tam olarak '{q_in}' geçen {len(final_results)} makale bulundu.")
-                    for w in final_results:
-                        with st.container():
-                            st.markdown(f"### 📄 {w.get('title')}")
-                            ca, cb = st.columns([4, 1])
-                            with ca:
-                                sn = (w.get('primary_location', {}).get('source', {}) or {}).get('display_name', 'Eğitim Dergisi')
-                                st.write(f"🏢 **Dergi:** {sn} | 📅 **Yıl:** {w.get('publication_year')}")
-                                if w.get('doi'):
-                                    st.write(f"[🔗 Makaleye Git]({w.get('doi')})")
-                            with cb:
-                                st.metric("Atıf", w.get('cited_by_count', 0))
-                            st.markdown("---")
-                else:
-                    st.warning(f"Başlığında tam olarak '{q_in}' ifadesi geçen eğitim makalesi bulunamadı.")
-            else:
-                st.error("Veri tabanı hatası.")
-        except:
-            st.error("Bağlantı hatası.")
-else:
-    st.info("Lütfen bir terim girin.")
+                    s_info = (w.get('primary_location', {}).get('source', {}) or {})
+                    s_name
