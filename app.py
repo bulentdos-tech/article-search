@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-# 1. SAYFA YAPILANDIRMASI
+# 1. SAYFA AYARLARI
 st.set_page_config(page_title="Prof. Dr. Bülent DÖŞ | Eğitim Bilimleri", page_icon="🎓", layout="wide")
 
 # 2. ÜST BAŞLIK
@@ -26,7 +26,6 @@ st.markdown("---")
 # 4. ARAMA VE AYIKLAMA SÜRECİ
 if query:
     with st.spinner('Eğitim veri tabanları taranıyor...'):
-        # API URL Hazırlığı
         url = f"https://api.openalex.org/works?filter=title.search:{query},concepts.id:C17744445,type:article&sort=cited_by_count:desc&per-page=100"
         if start_year:
             url += f",publication_year:>{start_year}"
@@ -45,17 +44,19 @@ if query:
                     t_lower = (work.get('title') or '').lower()
                     cites = work.get('cited_by_count') or 0
                     
-                    # Filtre kontrolü: Ne başlıkta ne dergi adında tıp terimi geçmemeli
                     is_med = any(bad in s_name for bad in ban_words) or any(bad in t_lower for bad in ban_words)
                     
                     if not is_med and cites >= min_cite:
                         final_list.append(work)
                 
-                # Ekrana basma
                 if final_list:
-                    st.success(f"Eğitim bilimleri odaklı {len(final_list[:50])} prestijli makale bulundu.")
+                    st.success(f"Eğitim bilimleri odaklı {len(final_list[:50])} çalışma bulundu.")
                     for work in final_list[:50]:
-                        t = work.get('title', 'Başlıksız')
-                        y = work.get('publication_year', 'Bilinmiyor')
-                        c = work.get('cited_by_count', 0)
-                        d = work.get('doi
+                        title_text = work.get('title', 'Başlıksız')
+                        year_text = work.get('publication_year', 'Bilinmiyor')
+                        cite_count = work.get('cited_by_count', 0)
+                        doi_link = work.get('doi', '#')
+                        
+                        source_info = work.get('primary_location', {}) or {}
+                        source_obj = source_info.get('source', {}) or {}
+                        journal_name = source_obj.get('display_name', 'Eğitim
