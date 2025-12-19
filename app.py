@@ -8,13 +8,14 @@ DICT = {
     "uzaktan öğrenme": "distance learning",
     "yapay zeka": "artificial intelligence",
     "ölçme değerlendirme": "assessment and evaluation",
-    "müfredat": "curriculum"
+    "müfredat": "curriculum",
+    "öğretmen eğitimi": "teacher education"
 }
 
 st.markdown("""
     <div style='text-align: center; padding: 20px; background-color: #0E1117; border-radius: 10px;'>
         <h1 style='color: #FF4B4B;'>🎓 Eğitim Bilimleri Gelişmiş Arama</h1>
-        <p style='color: #808495;'>İndeks ve Dergi Kalite Göstergeleri (Q1, Q2, SSCI/Scopus)</p>
+        <p style='color: #808495;'>Dergi Kalite Göstergeleri: SSCI & Scopus Tahmini</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -32,6 +33,7 @@ if q_in:
         search_term = f"({search_term} OR {DICT[search_term]})"
     
     with st.spinner('Dergi indeksleri ve makaleler analiz ediliyor...'):
+        # Sorguda kavramı eğitim (C17744445) olarak tutuyoruz
         url = f"https://api.openalex.org/works?search={search_term}&filter=concepts.id:C17744445,type:article,publication_year:>{y_start}&sort=cited_by_count:desc&per-page=50"
         
         try:
@@ -53,11 +55,17 @@ if q_in:
                     if cite < min_c:
                         continue
 
-                    # İndeks ve Q Değerlendirmesi
-                    # OpenAlex'te doğrudan "Q1" etiketi her zaman gelmez, 
-                    # ancak derginin tipine ve verilerine göre tahmin yürütebiliriz.
-                    is_scopus = "Scopus" if src_obj.get('is_in_doaj') == False else "İndeksli"
-                    issn = src_obj.get('issn', [])
+                    # İndeks Analizi
+                    is_scopus = False
+                    is_high_impact = False
+                    
+                    # Eğer derginin ISSN'si varsa ve OpenAlex'te indeks verisi doluysa
+                    # Genellikle Scopus ve SSCI dergilerinin ISSN'si sistemde kayıtlıdır.
+                    if src_obj.get('issn'):
+                        is_scopus = True # ISSN varsa büyük ihtimalle Scopus/SSCI adayıdır
+                    
+                    # SJR (SCImago Journal Rank) verisi kalite için en iyi göstergedir
+                    # Not: OpenAlex API'sinde bu bazen metadata içinde gelir.
                     
                     with st.container():
                         st.markdown(f"### 📄 {w.get('title')}")
@@ -67,19 +75,21 @@ if q_in:
                             st.write(f"📅 **Yıl:** {w.get('publication_year')}")
                             if w.get('doi'):
                                 st.write(f"[🔗 Makaleye Git]({w.get('doi')})")
+                        
                         with cb:
-                            # Dergi tipi ve prestij göstergesi
-                            st.markdown("🔍 **İndeks Bilgisi**")
-                            if src_obj.get('type') == 'journal':
-                                st.info("✅ Akademik Dergi")
-                                # Eğer dergi yüksek atıflıysa Q1/Q2 ihtimali yüksektir
-                                if cite > 100:
-                                    st.warning("🏆 Yüksek Etki (Q1/Q2)")
+                            st.markdown("🔍 **İndeks Tahmini**")
+                            if is_scopus:
+                                st.success("🟢 Scopus / SSCI Adayı")
+                                if cite > 50:
+                                    st.warning("🏆 Q1/Q2 Potansiyeli")
                             else:
-                                st.text("Diğer Yayın")
+                                st.info("ℹ️ Diğer İndeks")
+                        
                         with cc:
-                            st.metric("Atıf Sayısı", cite)
+                            st.metric("Atıf", cite)
                         st.markdown("---")
+                else:
+                    if not res: st.warning("Sonuç bulunamadı.")
             else:
                 st.error("Veri tabanı hatası.")
         except:
