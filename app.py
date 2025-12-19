@@ -15,7 +15,7 @@ st.markdown("""
 # 3. ARAMA PANELİ
 col1, col2, col3 = st.columns([3, 1, 1])
 with col1:
-    query = st.text_input("Makale Başlığında Ara (İngilizce Terimler Daha İyi Sonuç Verir):", placeholder="Örn: 'Curriculum' veya 'Educational Leadership'")
+    query = st.text_input("Makale Başlığında Ara:", placeholder="Örn: 'Curriculum' veya 'Teacher Training'")
 with col2:
     min_cite = st.number_input("Min. Atıf:", min_value=0, value=0)
 with col3:
@@ -26,7 +26,6 @@ st.markdown("---")
 # 4. ARAMA VE FİLTRELEME MANTIĞI
 if query:
     with st.spinner('Eğitim veri tabanları taranıyor...'):
-        # API Sorgusu: Sadece Eğitim (C17744445) kavramını ve makaleleri (article) istiyoruz
         url = f"https://api.openalex.org/works?filter=title.search:{query},concepts.id:C17744445,type:article&sort=cited_by_count:desc&per-page=100"
         
         if start_year:
@@ -37,13 +36,18 @@ if query:
             if r.status_code == 200:
                 results = r.json().get('results', [])
                 
-                # EĞİTİM DIŞI ALANLARI AYIKLAMA (SAĞLIK, TIP, VB.)
                 final_list = []
+                # Tıp ve sağlık terimlerini ayıklamak için kara liste
                 ban_keywords = ['diet', 'health', 'medical', 'weight', 'clinical', 'obesity', 'patient', 'surgery', 'nursing', 'physician', 'hospital']
                 
                 for work in results:
-                    source_name = (work.get('primary_location', {}).get('source', {}) or {}).get('display_name', '').lower()
+                    source_info = work.get('primary_location', {}) or {}
+                    source_obj = source_info.get('source', {}) or {}
+                    source_name = (source_obj.get('display_name') or '').lower()
                     title_lower = (work.get('title') or '').lower()
+                    cites = work.get('cited_by_count') or 0
                     
-                    # Filtreleme: Ne başlıkta ne dergi adında tıp terimi geçmemeli
-                    if not any(bad in source_name for bad in ban_keywords) and not any(bad in title_lower for bad in ban_keywords):
+                    # Filtreleme Kontrolü
+                    is_medical = any(bad in source_name for bad in ban_keywords) or any(bad in title_lower for bad in ban_keywords)
+                    
+                    if not is_medical and cites >= min_cite:
